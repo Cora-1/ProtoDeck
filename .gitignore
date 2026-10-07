@@ -1,0 +1,23 @@
+# ---------------------------------------------------------------- dependencies
+node_modules/
+
+# ------------------------------------------------------- firebase cli artefacts
+# `.firebase/` is a local deploy cache; debug logs are per-invocation noise.
+# NOTE: `.firebaserc` and `firebase.json` are intentionally tracked — they hold
+# only the project id and hosting config, no credentials.
+.firebase/
+firebase-debug.log
+firebase-debug.log.*
+*.log
+
+# ------------------------------------------------- build output (regenerated)
+# public/ is produced by `npm run build:public` from protodeck.html, and is
+# rebuilt automatically by `npm run deploy`. Never edit it by hand.
+public/
+
+# --------------------------------------------------------------- editor / os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
