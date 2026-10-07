@@ -1,0 +1,24 @@
+{
+  "name": "phishlens",
+  "version": "0.9.4",
+  "private": true,
+  "description": "PHISHLENS — offline forensic scam deconstructor (single-page, mock corpus).",
+  "scripts": {
+    "build:css": "tailwindcss -i src/input.css -o assets/styles.css --minify",
+    "dev": "tailwindcss -i src/input.css -o assets/styles.css --watch",
+    "serve": "node scripts/serve.js",
+    "build:public": "node scripts/build-public.js",
+    "deploy": "npm run build:public && firebase deploy --only hosting"
+  },
+  "keywords": [
+    "phishing",
+    "forensics",
+    "tailwindcss",
+    "vanilla-js"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

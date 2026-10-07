@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PROTODECK // TELEMETRY</title>
+<meta name="description" content="ProtoDeck — live telemetry console for drone & RC drivetrain testing." />
+<style>
+/* ============================================================================
+   PROTODECK // DESIGN SYSTEM
+   High-performance motorsport x custom robotics.
+   Self-contained: zero external requests, system font stacks only.
+   ========================================================================== */
+:root{
+  --carbon:#050505;
+  --graphite:#111111;
+  --graphite-2:#0b0b0b;
+  --acid:#E6FF00;
+  --acid-dim:rgba(230,255,0,.55);
+  --acid-glow:rgba(230,255,0,.18);
+  --white:#FFFFFF;
+  --gray:#444444;
+  --line:#242424;
+  --line-2:#333333;
+  --dim:#8A8A8A;
+  --dimmer:#5A5A5A;
+  --alert:#FF4D2E;
+
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --display: Impact, "Haettenschweiler", "Arial Narrow Bold", "Anton", "Oswald", "Arial Black", system-ui, sans-serif;
+  --wide: "Arial Narrow", "Helvetica Neue", Arial, system-ui, sans-serif;
+
+  --snap: .15s ease-out;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+html{background:var(--carbon);}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(1200px 620px at 12% -8%, #171717 0%, transparent 62%),
+    radial-gradient(900px 500px at 108% 12%, #121212 0%, transparent 60%),
+    linear-gradient(180deg,#050505 0%,#0b0b0b 45%,#111111 100%);
+  color:var(--white);
+  font-family:var(--mono);
+  font-size:13px;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{background:var(--acid);color:#000;}
+
+/* ---------- ambient layers: blueprint grid, scanlines, vignette ---------- */
+.fx{position:fixed;inset:0;pointer-events:none;z-index:0;}
+.fx-grid{
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.045) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 132px 132px, 132px 132px, 22px 22px, 22px 22px;
+  -webkit-mask-image: radial-gradient(ellipse 120% 90% at 50% 0%, #000 20%, transparent 78%);
+  mask-image: radial-gradient(ellipse 120% 90% at 50% 0%, #000 20%, transparent 78%);
+}
+.fx-scan{
+  background:repeating-linear-gradient(to bottom, rgba(255,255,255,.028) 0 1px, transparent 1px 3px);
+  opacity:.5;
+}
+.fx-vig{
+  background:radial-gradient(ellipse 120% 80% at 50% 45%, transparent 42%, rgba(0,0,0,.82) 100%);
+}
+
+/* ============================================================================
+   SHELL
+   ========================================================================== */
+.deck{position:relative;z-index:1;max-width:1720px;margin:0 auto;padding:0 16px 40px;}
+
+/* ---------- header ---------- */
+.top{border-bottom:1px solid var(--line-2);}
+.top-main{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:22px 0 14px;flex-wrap:wrap;}
+
+.brand{display:flex;align-items:flex-end;gap:14px;min-width:0;}
+.brand-mark{
+  width:58px;height:58px;flex:none;position:relative;
+  border:1px solid var(--acid-dim);background:
+    linear-gradient(135deg, rgba(230,255,0,.14), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(230,255,0,.10) 0 2px, transparent 2px 6px);
+  display:grid;place-items:center;
+}
+.brand-mark::after{content:"";position:absolute;inset:5px;border:1px solid rgba(230,255,0,.35);}
+.brand-mark svg{width:26px;height:26px;}
+.brand h1{
+  margin:0;font-family:var(--display);font-weight:900;
+  font-size:clamp(30px,5.4vw,68px);line-height:.86;letter-spacing:.005em;
+  text-transform:uppercase;white-space:nowrap;
+}
+.brand h1 .slash{color:var(--acid);text-shadow:0 0 18px var(--acid-dim);}
+.brand h1 .outline{
+  color:transparent;-webkit-text-stroke:1.4px var(--gray);
+  text-shadow:none;
+}
+.brand-sub{
+  display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;
+  font-size:9.5px;letter-spacing:.22em;color:var(--dimmer);text-transform:uppercase;
+}
+.brand-sub b{color:var(--acid);font-weight:400;}
+
+/* status cluster */
+.status{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;}
+.stat-block{
+  border:1px solid var(--line-2);padding:9px 12px;min-width:112px;
+  background:linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+}
+.stat-block .k{font-size:8.5px;letter-spacing:.2em;color:var(--dimmer);text-transform:uppercase;}
+.stat-block .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:19px;line-height:1.15;margin-top:3px;font-weight:700;}
+.stat-block .v small{font-size:10px;color:var(--dim);font-weight:400;margin-left:2px;}
+.stat-live{
+  border:1px solid var(--acid-dim);display:flex;align-items:center;gap:9px;padding:9px 14px;
+  background:linear-gradient(180deg, rgba(230,255,0,.10), rgba(230,255,0,.02));
+  box-shadow:0 0 22px rgba(230,255,0,.10) inset;
+}
+.dot{
+  width:9px;height:9px;background:var(--acid);border-radius:50%;
+  box-shadow:0 0 10px var(--acid),0 0 22px var(--acid-dim);
+  animation:blink 1.05s steps(1,end) infinite;
+}
+@keyframes blink{0%,62%{opacity:1}63%,100%{opacity:.15}}
+.stat-live .t{font-size:10px;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;}
+.stat-live .t b{color:var(--acid);font-weight:700;}
+
+/* control buttons */
+.ctl-row{display:flex;gap:6px;align-items:stretch;}
+.btn{
+  font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  padding:0 14px;height:100%;min-height:56px;cursor:pointer;
+  border:1px solid var(--line-2);background:linear-gradient(180deg, rgba(255,255,255,.03), transparent);
+  color:var(--white);transition:all var(--snap);border-radius:1px;
+}
+.btn:hover{border-color:var(--acid);color:var(--acid);box-shadow:0 0 0 1px var(--acid-glow), 0 0 20px var(--acid-glow);}
+.btn.primary{background:var(--acid);color:#000;border-color:var(--acid);font-weight:700;}
+.btn.primary:hover{background:#f2ff4d;color:#000;box-shadow:0 0 26px var(--acid-dim);}
+.btn.danger{border-color:rgba(255,77,46,.55);color:var(--alert);}
+.btn.danger:hover{border-color:var(--alert);color:#fff;background:rgba(255,77,46,.16);box-shadow:0 0 20px rgba(255,77,46,.28);}
+.btn.armed{background:var(--acid);color:#000;border-color:var(--acid);font-weight:700;}
+
+/* ---------- marquee ---------- */
+.ticker{
+  position:relative;overflow:hidden;border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line-2);background:#080808;
+}
+.ticker::before,.ticker::after{
+  content:"";position:absolute;top:0;bottom:0;width:70px;z-index:2;pointer-events:none;
+}
+.ticker::before{left:0;background:linear-gradient(90deg,#080808,transparent);}
+.ticker::after{right:0;background:linear-gradient(270deg,#080808,transparent);}
+.ticker-track{
+  display:flex;width:max-content;animation:slide 26s linear infinite;
+  padding:7px 0;font-size:10.5px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;
+}
+.ticker-track span{padding-right:38px;white-space:nowrap;}
+.ticker-track .hi{color:var(--acid);}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ============================================================================
+   BENTO GRID
+   ========================================================================== */
+.bento{
+  display:grid;grid-template-columns:repeat(12,minmax(0,1fr));
+  gap:10px;margin-top:14px;grid-auto-flow:row dense;
+}
+.panel{
+  position:relative;border:1px solid var(--line);border-radius:1px;
+  background:
+    linear-gradient(168deg, rgba(23,23,23,.96) 0%, rgba(9,9,9,.98) 52%, rgba(13,13,13,.99) 100%);
+  transition:transform var(--snap), border-color var(--snap), box-shadow var(--snap);
+  display:flex;flex-direction:column;min-width:0;overflow:hidden;
+}
+.panel::before,.panel::after{
+  content:"";position:absolute;width:9px;height:9px;pointer-events:none;opacity:.5;transition:opacity var(--snap);
+}
+.panel::before{top:3px;left:3px;border-top:2px solid var(--acid);border-left:2px solid var(--acid);}
+.panel::after{bottom:3px;right:3px;border-bottom:2px solid var(--acid);border-right:2px solid var(--acid);}
+.panel:hover{
+  transform:scale(1.01);border-color:var(--acid);z-index:6;
+  box-shadow:0 0 0 1px rgba(230,255,0,.22), 0 12px 40px rgba(0,0,0,.7), 0 0 34px var(--acid-glow);
+}
+.panel:hover::before,.panel:hover::after{opacity:1;}
+
+.p-head{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;
+  border-bottom:1px solid var(--line);background:rgba(255,255,255,.015);
+}
+.p-idx{
+  font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:#000;background:var(--acid);
+  padding:2px 5px;font-weight:700;
+}
+.p-head h2{
+  margin:0;font-family:var(--wide);font-weight:700;font-size:12.5px;letter-spacing:.24em;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.p-chip{
+  margin-left:auto;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--dimmer);border:1px solid var(--line-2);padding:2px 6px;white-space:nowrap;
+}
+.p-chip.on{color:var(--acid);border-color:var(--acid-dim);}
+.p-chip.warn{color:var(--alert);border-color:rgba(255,77,46,.5);}
+
+/* --- tilt link: phone-as-controller ------------------------------------- */
+.p-chip.btn-chip{
+  margin-left:auto;cursor:pointer;background:transparent;font-family:var(--mono);
+  appearance:none;transition:all var(--snap);
+}
+.p-chip.btn-chip + .p-chip.btn-chip{margin-left:6px;}
+.p-chip.btn-chip:hover{color:var(--acid);border-color:var(--acid-dim);box-shadow:0 0 16px var(--acid-glow);}
+.p-chip.btn-chip:active{transform:translateY(1px);}
+.p-chip.linked{
+  color:#000;background:var(--acid);border-color:var(--acid);font-weight:700;
+  box-shadow:0 0 18px var(--acid-dim);
+}
+.p-chip.denied{color:var(--alert);border-color:rgba(255,77,46,.5);}
+.motion-hint{
+  display:none;align-items:center;gap:8px;padding:7px 9px;line-height:1.25;
+  border:1px solid var(--acid-dim);
+  background:linear-gradient(90deg, rgba(230,255,0,.11), rgba(230,255,0,.02));
+  font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--acid);
+}
+.motion-hint.on{display:flex;animation:lineIn .2s ease-out;}
+.motion-hint.denied{border-color:rgba(255,77,46,.5);background:rgba(255,77,46,.10);color:var(--alert);}
+.motion-hint i{width:6px;height:6px;flex:none;background:currentColor;border-radius:50%;animation:blink 1s steps(1,end) infinite;}
+.motion-hint b{margin-left:auto;color:var(--dim);font-weight:400;letter-spacing:.14em;}
+.p-body{padding:12px;flex:1;min-height:0;display:flex;flex-direction:column;}
+
+/* spans */
+.span-a{grid-column:span 6;grid-row:span 2;}
+.span-b{grid-column:span 3;}
+.span-c{grid-column:span 3;}
+.span-d{grid-column:span 6;}
+.span-kpi{grid-column:span 12;}
+
+/* ============================================================================
+   PANEL A — CHASSIS ORIENTATION
+   ========================================================================== */
+.a-body{flex-direction:row;gap:12px;align-items:stretch;}
+.gyro-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.gyro-stage{
+  position:relative;flex:1;min-height:210px;border:1px solid var(--line);
+  perspective:760px;overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(230,255,0,.055), transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,.012), transparent);
+}
+.gyro-stage::after{
+  content:"";position:absolute;inset:0;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size:20px 20px;z-index:0;
+}
+.gyro-plane,.gyro-reticle{
+  position:absolute;inset:12%;transform-style:preserve-3d;z-index:2;
+  display:grid;place-items:center;will-change:transform;
+}
+.gyro-plane{
+  border:1px solid rgba(230,255,0,.35);
+  background:
+    linear-gradient(180deg, rgba(230,255,0,.075), transparent 55%),
+    conic-gradient(from 0deg, rgba(230,255,0,.10), transparent 25%, rgba(230,255,0,.10) 50%, transparent 75%, rgba(230,255,0,.10));
+  box-shadow:0 0 34px rgba(230,255,0,.07);
+}
+.ring{
+  position:absolute;width:76%;aspect-ratio:1;border-radius:50%;
+  border:1px solid rgba(255,255,255,.30);
+}
+.ring.r2{width:52%;border-color:rgba(230,255,0,.65);border-style:dashed;}
+.ring.r3{width:26%;border-color:rgba(255,255,255,.45);}
+.axis{position:absolute;background:rgba(230,255,0,.55);}
+.axis.x{width:96%;height:1px;}
+.axis.y{height:96%;width:1px;}
+.axis.d1,.axis.d2{width:130%;height:1px;background:rgba(255,255,255,.10);}
+.axis.d1{transform:rotate(45deg);}
+.axis.d2{transform:rotate(-45deg);}
+.horizon{
+  position:absolute;width:112%;height:2px;background:var(--acid);
+  box-shadow:0 0 14px var(--acid),0 0 30px var(--acid-dim);
+}
+.horizon::before{
+  content:"";position:absolute;left:50%;top:-5px;width:10px;height:10px;margin-left:-5px;
+  background:var(--acid);transform:rotate(45deg);
+}
+.core{
+  position:absolute;width:16px;height:16px;background:#000;
+  border:1px solid var(--acid);box-shadow:0 0 16px var(--acid-dim);
+  transform:rotate(45deg);
+}
+.reticle{
+  position:absolute;inset:0;z-index:3;pointer-events:none;
+}
+.reticle i{position:absolute;background:var(--acid);opacity:.7;}
+.reticle i.h{height:1px;width:16px;}
+.reticle i.v{width:1px;height:16px;}
+.reticle i.tl{top:10px;left:10px;} .reticle i.tr{top:10px;right:10px;}
+.reticle i.bl{bottom:10px;left:10px;} .reticle i.br{bottom:10px;right:10px;}
+.reticle .badge{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  font-size:8.5px;letter-spacing:.24em;color:var(--acid);border:1px solid var(--acid-dim);
+  padding:2px 8px;background:rgba(0,0,0,.6);white-space:nowrap;
+}
+.gyro-foot{display:flex;gap:8px;align-items:center;font-size:9px;letter-spacing:.16em;color:var(--dimmer);text-transform:uppercase;}
+.gyro-foot .bar{flex:1;height:3px;background:var(--line);position:relative;overflow:hidden;}
+.gyro-foot .bar i{position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--acid);transition:transform .12s linear;}
+
+.att-col{width:158px;flex:none;display:flex;flex-direction:column;gap:8px;}
+.att{
+  border:1px solid var(--line);padding:8px 10px;background:rgba(0,0,0,.35);
+  display:flex;flex-direction:column;gap:6px;flex:1;justify-content:center;
+}
+.att .k{font-size:8.5px;letter-spacing:.22em;color:var(--dimmer);text-transform:uppercase;}
+.att .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:26px;line-height:1;letter-spacing:-.02em;}
+.att .v em{font-style:normal;font-size:11px;color:var(--dim);font-weight:400;margin-left:2px;}
+.att .scale{height:2px;background:var(--line-2);position:relative;}
+.att .scale i{position:absolute;top:-3px;width:2px;height:8px;background:var(--acid);left:50%;transition:left .12s linear;box-shadow:0 0 8px var(--acid);}
+.att.hot .v{color:var(--acid);}
+
+/* ============================================================================
+   PANEL B — MOTOR RPM / THRUST
+   ========================================================================== */
+.leds{display:flex;gap:3px;margin-bottom:10px;}
+.leds i{
+  flex:1;height:6px;background:#1c1c1c;border:1px solid #262626;transition:background .12s linear, box-shadow .12s linear;
+}
+.leds i.lit{background:var(--acid);border-color:var(--acid);box-shadow:0 0 10px var(--acid);}
+.leds i.red{background:var(--alert);border-color:var(--alert);box-shadow:0 0 12px rgba(255,77,46,.8);}
+.motors{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;min-height:158px;}
+.motor{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.motor .cap{
+  font-size:8.5px;letter-spacing:.14em;color:var(--dim);text-align:center;
+  border:1px solid var(--line);padding:2px 0;background:rgba(255,255,255,.02);
+}
+.motor .track{
+  position:relative;flex:1;background:
+    linear-gradient(180deg, rgba(255,255,255,.035), transparent),
+    repeating-linear-gradient(to top, rgba(255,255,255,.07) 0 1px, transparent 1px 12px);
+  border:1px solid var(--line);overflow:hidden;
+}
+.motor .fill{
+  position:absolute;left:0;right:0;bottom:0;height:60%;
+  background:linear-gradient(180deg, var(--acid) 0%, rgba(230,255,0,.55) 30%, rgba(230,255,0,.10) 100%);
+  transition:height .09s linear, box-shadow .12s linear, filter .12s linear;
+}
+.motor .peak{
+  position:absolute;left:0;right:0;height:1px;background:var(--white);opacity:.55;
+  bottom:70%;transition:bottom .12s linear;
+}
+.motor .val{
+  text-align:center;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:13px;font-weight:700;letter-spacing:-.02em;
+}
+.motor .val small{font-size:8.5px;color:var(--dim);font-weight:400;}
+.motor.hot .fill{box-shadow:0 0 18px var(--acid),0 0 40px var(--acid-glow);}
+.motor.hot .val{color:var(--acid);}
+.motor.over .cap{border-color:var(--alert);color:var(--alert);}
+
+/* ============================================================================
+   PANEL C — POWER & VITALS
+   ========================================================================== */
+.power-hero{display:flex;flex-direction:column;gap:2px;}
+.power-hero .k{font-size:8.5px;letter-spacing:.24em;color:var(--dimmer);text-transform:uppercase;}
+.power-hero .big{
+  font-family:var(--display);font-weight:900;font-size:clamp(38px,4.4vw,58px);line-height:.9;
+  letter-spacing:.005em;font-variant-numeric:tabular-nums;transition:color .12s linear;
+}
+.power-hero .big span{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--dim);margin-left:6px;}
+.sag .power-hero .big{color:var(--alert);text-shadow:0 0 22px rgba(255,77,46,.5);}
+.vitals{display:flex;flex-direction:column;gap:0;margin-top:12px;border-top:1px solid var(--line);}
+.vrow{
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  padding:7px 0;border-bottom:1px solid var(--line);
+}
+.vrow .k{font-size:9px;letter-spacing:.18em;color:var(--dimmer);text-transform:uppercase;}
+.vrow .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;}
+.vrow .v small{color:var(--dim);font-size:9.5px;font-weight:400;margin-left:2px;}
+.vrow.alert .v{color:var(--alert);}
+.alert-strip{
+  margin-top:auto;border:1px solid rgba(255,77,46,.45);background:rgba(255,77,46,.10);
+  color:var(--alert);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  padding:6px 8px;text-align:center;opacity:0;transition:opacity .1s linear;
+}
+.sag .alert-strip{opacity:1;animation:flash .32s steps(1,end) infinite;}
+@keyframes flash{0%,49%{opacity:1}50%,100%{opacity:.25}}
+.spark{width:100%;height:30px;display:block;border:1px solid var(--line);background:rgba(0,0,0,.4);margin-top:10px;}
+
+/* ============================================================================
+   PANEL D — TERMINAL
+   ========================================================================== */
+.term{
+  flex:1;min-height:170px;max-height:260px;overflow:hidden;
+  font-family:var(--mono);font-size:11px;line-height:1.62;
+  background:linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.35));
+  border:1px solid var(--line);padding:9px 10px;display:flex;flex-direction:column;justify-content:flex-end;
+}
+.term-line{white-space:pre;overflow:hidden;text-overflow:ellipsis;animation:lineIn .18s ease-out;}
+@keyframes lineIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.t-time{color:#3d3d3d;margin-right:8px;}
+.t-tag{font-weight:700;margin-right:8px;}
+.sev-SYS .t-tag{color:var(--white);}
+.sev-DATA .t-tag{color:var(--dimmer);}
+.sev-OK .t-tag{color:var(--acid);}
+.sev-WARN .t-tag{color:var(--alert);}
+.sev-SYS{color:#bdbdbd;}
+.sev-DATA{color:#7c7c7c;}
+.sev-OK{color:#c9d9a0;}
+.sev-WARN{color:#ff9a80;}
+.caret-line{color:var(--acid);}
+.caret-line::after{content:"▌";animation:blink 1s steps(1,end) infinite;margin-left:2px;}
+
+/* ============================================================================
+   KPI STRIP
+   ========================================================================== */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;}
+.kpi{
+  border:1px solid var(--line);background:linear-gradient(168deg, rgba(20,20,20,.95), rgba(9,9,9,.98));
+  padding:10px 12px;position:relative;transition:transform var(--snap), border-color var(--snap), box-shadow var(--snap);
+}
+.kpi:hover{transform:scale(1.02);border-color:var(--acid);box-shadow:0 0 0 1px var(--acid-glow),0 0 26px var(--acid-glow);z-index:5;}
+.kpi .k{font-size:8.5px;letter-spacing:.2em;color:var(--dimmer);text-transform:uppercase;display:flex;justify-content:space-between;gap:6px;}
+.kpi .k b{color:var(--gray);font-weight:400;}
+.kpi .v{
+  font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;
+  font-size:clamp(22px,2.4vw,32px);line-height:1.05;margin-top:6px;letter-spacing:-.02em;
+}
+.kpi .v u{font-size:10.5px;color:var(--dim);text-decoration:none;margin-left:3px;font-weight:400;}
+.kpi .s{font-size:9px;letter-spacing:.14em;color:var(--dimmer);margin-top:4px;text-transform:uppercase;}
+.kpi.acid .v{color:var(--acid);}
+.kpi.warn .v{color:var(--alert);}
+.kpi .spark{margin-top:8px;height:26px;}
+.kpi .meter{
+  margin-top:10px;height:4px;background:var(--line);position:relative;overflow:hidden;
+}
+.kpi .meter i{
+  position:absolute;top:0;bottom:0;left:0;width:0;background:var(--acid);
+  box-shadow:0 0 10px var(--acid);transition:width .1s linear, left .1s linear;
+}
+.kpi .meter.zero i{width:2px;box-shadow:0 0 10px var(--acid),0 0 20px var(--acid-dim);}
+.kpi.warn .meter i{background:var(--alert);box-shadow:0 0 10px var(--alert);}
+
+/* ---------- footer ---------- */
+.foot{
+  margin-top:16px;border-top:1px solid var(--line-2);padding-top:12px;
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  font-size:9px;letter-spacing:.22em;color:#3f3f3f;text-transform:uppercase;
+}
+.foot b{color:var(--dim);font-weight:400;}
+
+/* ---------- responsive ---------- */
+@media (max-width:1280px){
+  .span-a{grid-column:span 12;grid-row:auto;}
+  .span-b{grid-column:span 6;}
+  .span-c{grid-column:span 6;}
+  .span-d{grid-column:span 12;}
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+@media (max-width:860px){
+  .span-b,.span-c{grid-column:span 12;}
+  .a-body{flex-direction:column;}
+  .att-col{width:auto;flex-direction:row;flex-wrap:wrap;}
+  .att{min-width:132px;}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .top-main{gap:14px;}
+  .brand h1{white-space:normal;}
+  .status{width:100%;}
+  .stat-block{flex:1;}
+}
+@media (max-width:520px){
+  .kpis{grid-template-columns:minmax(0,1fr);}
+  .motors{min-height:132px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .ticker-track{animation-duration:80s;}
+  .panel,.kpi{transition:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="fx fx-grid"></div>
+<div class="fx fx-scan"></div>
+<div class="fx fx-vig"></div>
+
+<div class="deck">
+
+  <!-- ================= HEADER ================= -->
+  <header class="top">
+    <div class="top-main">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="#E6FF00" stroke-width="2">
+            <path d="M4 24V8h6l6 9 6-9h6v16" stroke-linejoin="miter"/>
+            <path d="M16 17v7" stroke="#FFFFFF" stroke-width="1.4"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Protodeck <span class="slash">//</span> <span class="outline">Telemetry</span></h1>
+          <div class="brand-sub">
+            <span>Unit <b>PD-04</b></span>
+            <span>Platform <b>4WD / QUAD-ROTOR</b></span>
+            <span>Firmware <b>v2.14.8-rc</b></span>
+            <span>Operator <b>A. NAKAMURA</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="status">
+        <div class="stat-block">
+          <div class="k">Run Time</div>
+          <div class="v" id="runTime">00:00:00</div>
+        </div>
+        <div class="stat-block">
+          <div class="k">Loop Rate</div>
+          <div class="v"><span id="loopRate">1000</span><small>Hz</small></div>
+        </div>
+        <div class="stat-live">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="t">SYS.ACTIVE: <b>DRONE &amp; RC LINK</b><br />
+          <span style="color:#8a8a8a;letter-spacing:.16em">RSSI <span id="rssiMini">-52</span> dBm · PING <span id="ping">12</span>ms</span></span>
+        </div>
+        <div class="ctl-row">
+          <button class="btn" id="btnArm" type="button">Arm</button>
+          <button class="btn primary" id="btnRun" type="button">Launch Seq</button>
+          <button class="btn danger" id="btnAbort" type="button">Abort</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MARQUEE ================= -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
+
+  <!-- ================= BENTO GRID ================= -->
+  <main class="bento">
+
+    <!-- PANEL A -->
+    <section class="panel span-a" aria-label="Chassis orientation">
+      <div class="p-head">
+        <span class="p-idx">01</span>
+        <h2>Chassis Orientation</h2>
+        <button class="p-chip btn-chip" id="imuChip" type="button"
+                title="Link this device's tilt sensor and fly the chassis by moving your phone">TILT // SIM</button>
+        <button class="p-chip btn-chip" id="recenterBtn" type="button" hidden
+                title="Treat the current phone pose as level">RECENTER</button>
+      </div>
+      <div class="p-body a-body">
+        <div class="gyro-wrap">
+          <div class="motion-hint" id="motionHint" role="status" aria-live="polite">
+            <i aria-hidden="true"></i>
+            <span id="motionHintText"></span>
+            <b id="motionHintMeta">GYRO + ACCEL</b>
+          </div>
+          <div class="gyro-stage">
+            <div class="gyro-plane" id="gyroPlane">
+              <div class="ring r1"></div>
+              <div class="ring r2"></div>
+              <div class="ring r3"></div>
+              <div class="axis x"></div>
+              <div class="axis y"></div>
+              <div class="axis d1"></div>
+              <div class="axis d2"></div>
+              <div class="horizon" id="horizon"></div>
+              <div class="core"></div>
+            </div>
+            <div class="reticle">
+              <i class="h tl"></i><i class="v tl"></i>
+              <i class="h tr"></i><i class="v tr"></i>
+              <i class="h bl"></i><i class="v bl"></i>
+              <i class="h br"></i><i class="v br"></i>
+              <span class="badge" id="attBadge">ATT HOLD // 0.08s</span>
+            </div>
+          </div>
+          <div class="gyro-foot">
+            <span>Tilt</span>
+            <span class="bar"><i id="tiltBar"></i></span>
+            <span id="tiltVal">0.0°</span>
+          </div>
+        </div>
+
+        <div class="att-col">
+          <div class="att hot">
+            <div class="k">Pitch</div>
+            <div class="v"><span id="pitch">0.0</span><em>deg</em></div>
+            <div class="scale"><i id="pitchBar"></i></div>
+          </div>
+          <div class="att">
+            <div class="k">Yaw</div>
+            <div class="v"><span id="yaw">0.0</span><em>deg</em></div>
+            <div class="scale"><i id="yawBar"></i></div>
+          </div>
+          <div class="att">
+            <div class="k">Roll</div>
+            <div class="v"><span id="roll">0.0</span><em>deg</em></div>
+            <div class="scale"><i id="rollBar"></i></div>
+          </div>
+          <div class="att">
+            <div class="k">G-Force</div>
+            <div class="v"><span id="gforce">0.00</span><em>g</em></div>
+            <div class="scale"><i id="gBar"></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL B -->
+    <section class="panel span-b" aria-label="Motor RPM and thrust">
+      <div class="p-head">
+        <span class="p-idx">02</span>
+        <h2>Motor / Thrust</h2>
+        <span class="p-chip" id="escChip">ESC // 4x SYNC</span>
+      </div>
+      <div class="p-body">
+        <div class="leds" id="leds"></div>
+        <div class="motors" id="motors">
+          <div class="motor" data-m="FL">
+            <div class="cap">FRONT-L</div>
+            <div class="track"><div class="fill"></div><div class="peak"></div></div>
+            <div class="val"><span class="pct">0</span><small>%</small></div>
+          </div>
+          <div class="motor" data-m="FR">
+            <div class="cap">FRONT-R</div>
+            <div class="track"><div class="fill"></div><div class="peak"></div></div>
+            <div class="val"><span class="pct">0</span><small>%</small></div>
+          </div>
+          <div class="motor" data-m="RL">
+            <div class="cap">REAR-L</div>
+            <div class="track"><div class="fill"></div><div class="peak"></div></div>
+            <div class="val"><span class="pct">0</span><small>%</small></div>
+          </div>
+          <div class="motor" data-m="RR">
+            <div class="cap">REAR-R</div>
+            <div class="track"><div class="fill"></div><div class="peak"></div></div>
+            <div class="val"><span class="pct">0</span><small>%</small></div>
+          </div>
+        </div>
+        <div class="gyro-foot" style="margin-top:10px">
+          <span>Total thrust</span>
+          <span class="bar"><i id="thrustBar" style="left:0"></i></span>
+          <span id="thrustVal">0.0 N</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL C -->
+    <section class="panel span-c" id="powerPanel" aria-label="Power and vitals">
+      <div class="p-head">
+        <span class="p-idx">03</span>
+        <h2>Power / Vitals</h2>
+        <span class="p-chip on" id="packChip">PACK // 6S</span>
+      </div>
+      <div class="p-body">
+        <div class="power-hero">
+          <div class="k">Cell Voltage</div>
+          <div class="big"><span id="cellV">3.70</span><span>V / CELL</span></div>
+        </div>
+        <div class="vitals">
+          <div class="vrow"><span class="k">Pack total</span><span class="v"><span id="packV">22.20</span><small>V</small></span></div>
+          <div class="vrow"><span class="k">Draw</span><span class="v"><span id="amps">14.2</span><small>A</small></span></div>
+          <div class="vrow" id="tempRow"><span class="k">ESC temp</span><span class="v"><span id="escTemp">41.6</span><small>°C</small></span></div>
+          <div class="vrow"><span class="k">Consumed</span><span class="v"><span id="mah">1240</span><small>mAh</small></span></div>
+          <div class="vrow"><span class="k">Sag Δ</span><span class="v"><span id="sagD">0.02</span><small>V</small></span></div>
+        </div>
+        <canvas class="spark" id="ampSpark" width="600" height="60"></canvas>
+        <div class="alert-strip" id="alertStrip">⚠ Voltage sag under throttle</div>
+      </div>
+    </section>
+
+    <!-- PANEL D -->
+    <section class="panel span-d" aria-label="Live command terminal">
+      <div class="p-head">
+        <span class="p-idx">04</span>
+        <h2>Live Command Terminal</h2>
+        <span class="p-chip on" id="busChip">BUS // 1 MBPS</span>
+      </div>
+      <div class="p-body">
+        <div class="term" id="term" role="log" aria-live="off"></div>
+      </div>
+    </section>
+
+    <!-- KPI STRIP -->
+    <section class="panel span-kpi" aria-label="Live key metrics">
+      <div class="p-body" style="padding:10px">
+        <div class="kpis">
+          <div class="kpi acid">
+            <div class="k">Throttle <b>CH1</b></div>
+            <div class="v"><span id="thr">0</span><u>%</u></div>
+            <div class="s" id="thrMode">HOLD // IDLE</div>
+            <div class="meter"><i id="thrMeter"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="k">Steering <b>CH2</b></div>
+            <div class="v"><span id="steer">0</span><u>°</u></div>
+            <div class="s">DAMPING 0.42</div>
+            <div class="meter zero"><i id="steerMeter"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="k">Bank / Incline</div>
+            <div class="v"><span id="incline">0</span><u>°</u></div>
+            <div class="s">SLIP ANGLE <span id="slip">0.0</span></div>
+            <div class="meter zero"><i id="inclineMeter"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="k">RSSI / Link</div>
+            <div class="v"><span id="rssi">-52</span><u>dBm</u></div>
+            <div class="s">LOSS <span id="loss">0.00</span>%</div>
+            <canvas class="spark" id="rssiSpark" width="600" height="52"></canvas>
+          </div>
+          <div class="kpi" id="tempKpi">
+            <div class="k">ESC Temp <b>MAX</b></div>
+            <div class="v"><span id="escMax">41.6</span><u>°C</u></div>
+            <div class="s" id="tempState">NOMINAL</div>
+            <div class="meter"><i id="tempMeter"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="k">Latency / Pkts</div>
+            <div class="v"><span id="lat">12</span><u>ms</u></div>
+            <div class="s">RX <span id="pkts">18.4</span>k / s</div>
+            <div class="meter"><i id="latMeter"></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="foot">
+    <span>PROTODECK © 2026 — MOCK TELEMETRY STREAM</span>
+    <span>LINK <b id="linkState">RC / 2.4GHz FHSS</b></span>
+    <span>SESSION <b id="sessionId">—</b></span>
+    <span>CLOCK <b id="clock">--:--:--</b></span>
+  </footer>
+</div>
+
+<script>
+/* ============================================================================
+   PROTODECK // TELEMETRY ENGINE
+   One rAF loop drives every readout; values are smoothed random walks so the
+   numbers behave like real sensor noise instead of pure jitter.
+   ========================================================================== */
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const LERP = (a, b, t) => a + (b - a) * t;
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------------------------------------------------------- marquee */
+  const TICKER = [
+    '> INCOMING DATA STREAM', 'PING: 12ms', 'PACKET LOSS: 0.00%', 'NOZZLE TEMP: NOMINAL',
+    'GYRO BIAS TRIMMED', 'ESC SYNC 4/4', 'RSSI -52dBm', 'LOOP 1.90ms', 'BUS 1MBPS'
+  ];
+  (function buildTicker() {
+    const unit = TICKER.map((t) => `<span class="${/PING|SYNC|LOOP/.test(t) ? 'hi' : ''}">${t}</span>`).join('');
+    $('tickerTrack').innerHTML = unit + unit; // duplicated for a seamless loop
+  })();
+
+  /* --------------------------------------------------------- motor LED strip */
+  const LEDS = 14;
+  (function buildLeds() {
+    $('leds').innerHTML = Array.from({ length: LEDS }, () => '<i></i>').join('');
+  })();
+  const ledEls = Array.from($('leds').children);
+
+  /* -------------------------------------------------------------- state ---- */
+  const S = {
+    t: 0,
+    pitch: 0, pitchT: 0, pitchNext: 0,
+    yaw: 0, yawT: 0, yawNext: 0,
+    roll: 0, rollT: 0, rollNext: 0,
+    gforce: 1.02, gTarget: 1.02,
+    beep: 0,
+    motors: {},
+    throttle: 34, thrTarget: 34,
+    steer: 0, steerTarget: 0,
+    amps: 14.2, ampTarget: 14.2,
+    cellV: 3.70,
+    escTemp: 41.6,
+    mah: 1240,
+    rssi: -52, rssiTarget: -52,
+    loss: 0,
+    lat: 12,
+    pkts: 18.4,
+    sag: false,
+    spikeUntil: 0,
+    sagUntil: 0,
+    sagActive: false,
+    /* these are SIM SECONDS (S.t is a wall-clock-independent sim clock) */
+    nextSpike: 2.4,
+    nextSag: 3.2,
+    nextBeep: 1.1,
+    gyroNext: 0,
+    armed: false,
+    running: true,
+    spikeCount: 0,
+    sagCount: 0
+  };
+
+  ['FL', 'FR', 'RL', 'RR'].forEach((k) => {
+    S.motors[k] = { v: 62, target: 62, next: 0 };
+  });
+
+  const RUN_START = Date.now();
+  const SESSION = 'RN-' + String(Math.floor(Date.now() / 1000) % 100000).padStart(5, '0');
+  $('sessionId').textContent = SESSION;
+
+  /* ------------------------------------------------------------- terminal -- */
+  const TERM = [
+    ['SYS', 'Gyro calibrated · bias 0.004 °/s'],
+    ['SYS', 'ESC arm sequence complete · 4/4 ACK'],
+    ['OK', 'Loop time 1.90ms · jitter 0.06ms'],
+    ['DATA', 'ATT 5142.88 / -0.1278 / 51.5074 · sats 11'],
+    ['DATA', '0x8F2A 0x11C0 0x93AD 0x0021 0xFFFF'],
+    ['OK', 'Telemetry synced · frame 128B @ 1MBPS'],
+    ['STAT', 'nozzle temp nominal · 38.2°C'],
+    ['WARN', 'ESC 2 temp rising · 44.1°C'],
+    ['SYS', 'RX bind locked · 2.4GHz FHSS'],
+    ['DATA', 'PWM 1520 / 1480 / 1512 / 1524 µs'],
+    ['OK', 'IMU fusion EKF converged · residual 0.7%'],
+    ['STAT', 'pack internal resistance 2.4mΩ'],
+    ['WARN', 'packet loss spike 0.42% · hop 17'],
+    ['DATA', 'hex dump 4F 54 4F 52 51 46 48 4A 44'],
+    ['OK', 'thrust curve trimmed · gain 1.04'],
+    ['SYS', 'logging to volatile buffer · ring 4096'],
+    ['DATA', 'CAN id 0x1A4 · dlc 8 · 4E 2A 00 91 0C FF 3B 77'],
+    ['STAT', 'descent rate estimator armed'],
+    ['OK', 'watchdog fed · window 250ms']
+  ];
+  let termLines = [];
+  const termEl = $('term');
+
+  function stamp() {
+    const d = new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()]
+      .map((n) => String(n).padStart(2, '0')).join(':') +
+      '.' + String(d.getMilliseconds()).padStart(3, '0');
+  }
+
+  function pushLog(tag, text) {
+    termLines.push({ time: stamp(), tag, text });
+    if (termLines.length > 15) termLines.shift();
+    renderLog();
+  }
+
+  function renderLog() {
+    termEl.innerHTML = termLines.map((l) => {
+      const sev = l.tag === 'STAT' ? 'OK' : l.tag;
+      return `<div class="term-line sev-${sev}"><span class="t-time">${l.time}</span>` +
+             `<span class="t-tag">[${l.tag}]</span>${l.text}</div>`;
+    }).join('') + '<div class="term-line caret-line"></div>';
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const l = TERM[(Math.random() * TERM.length) | 0];
+    termLines.push({ time: stamp(), tag: l[0], text: l[1] });
+  }
+  renderLog();
+
+  /* -------------------------------------------------------------- sparkline */
+  function makeSpark(canvasId, opts) {
+    const c = $(canvasId);
+    const ctx = c.getContext('2d');
+    const data = [];
+    const N = 120;
+    const colour = (opts && opts.colour) || '#E6FF00';
+    for (let i = 0; i < N; i++) data.push(opts && opts.init ? opts.init() : 0);
+
+    function draw() {
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.clientWidth || 300, h = c.clientHeight || 30;
+      if (c.width !== w * dpr || c.height !== h * dpr) {
+        c.width = w * dpr; c.height = h * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const min = opts.min, max = opts.max;
+      const span = max - min || 1;
+      const step = w / (N - 1);
+
+      // baseline grid
+      ctx.strokeStyle = 'rgba(255,255,255,.06)';
+      ctx.lineWidth = 1;
+      for (let g = 1; g < 4; g++) {
+        const y = (h / 4) * g;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      // trace
+      ctx.beginPath();
+      data.forEach((v, i) => {
+        const y = h - ((clamp(v, min, max) - min) / span) * h;
+        i ? ctx.lineTo(i * step, y) : ctx.moveTo(0, y);
+      });
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = 1.4;
+      ctx.shadowColor = colour;
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // fill
+      ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+      ctx.fillStyle = colour.replace('#', 'rgba(') ;
+      const rgb = hexToRgb(colour);
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, `rgba(${rgb},.22)`);
+      grad.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // head dot
+      const last = data[data.length - 1];
+      const ly = h - ((clamp(last, min, max) - min) / span) * h;
+      ctx.fillStyle = colour;
+      ctx.beginPath(); ctx.arc(w - 1, ly, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+    return { push(v) { data.push(v); if (data.length > N) data.shift(); }, draw };
+  }
+  function hexToRgb(h) {
+    const n = parseInt(h.slice(1), 16);
+    return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+  }
+
+  const ampSpark = makeSpark('ampSpark', { min: 0, max: 42, colour: '#E6FF00', init: () => 14 });
+  const rssiSpark = makeSpark('rssiSpark', { min: -95, max: -30, colour: '#E6FF00', init: () => -52 });
+
+  /* --------------------------------------------------------------- controls */
+  $('btnArm').addEventListener('click', () => {
+    S.armed = !S.armed;
+    const b = $('btnArm');
+    b.classList.toggle('armed', S.armed);
+    b.textContent = S.armed ? 'Armed ✓' : 'Arm';
+    $('escChip').textContent = S.armed ? 'ESC // ARMED' : 'ESC // 4x SYNC';
+    $('escChip').classList.toggle('on', S.armed);
+    pushLog('SYS', S.armed ? 'arm sequence accepted · props hot' : 'disarm sequence complete');
+    $('busChip').textContent = S.armed ? 'BUS // HOT' : 'BUS // 1 MBPS';
+    $('busChip').classList.toggle('warn', S.armed);
+  });
+
+  $('btnRun').addEventListener('click', () => {
+    S.running = true;
+    S.spikeUntil = S.t + 1400;
+    S.thrTarget = 100;
+    S.running = true;
+    pushLog('OK', 'launch sequence 04 · throttle ramp 100%');
+    $('thrMode').textContent = 'RAMP // 100%';
+    $('btnRun').textContent = 'Launching';
+    setTimeout(() => { $('btnRun').textContent = 'Launch Seq'; }, 1500);
+    setTimeout(() => { S.thrTarget = 40; $('thrMode').textContent = 'HOLD // IDLE'; }, 1900);
+  });
+
+  $('btnAbort').addEventListener('click', () => {
+    S.spikeUntil = 0;
+    S.thrTarget = 0;
+    pushLog('WARN', 'ABORT RECEIVED · throttle cut · failsafe engaged');
+    $('thrMode').textContent = 'CUT // FAILSAFE';
+    $('busChip').textContent = 'BUS // 1 MBPS';
+    $('busChip').classList.remove('warn');
+    const b = $('btnAbort');
+    b.classList.add('primary');
+    setTimeout(() => b.classList.remove('primary'), 320);
+  });
+
+  /* ========================================================== MOTION LINK
+     Phone-as-controller. Device orientation drives the chassis attitude,
+     which in turn drives the motor mix, current draw, G-load and the log.
+     iOS 13+ needs a user gesture for requestPermission(), and the sensor
+     only exists in a secure context — the live site is HTTPS, so it works
+     there; desktop browsers simply report no sensor and stay in sim mode. */
+  const MO = {
+    supported: typeof window.DeviceOrientationEvent !== 'undefined',
+    state: 'sim',           // sim | linked | denied | nosensor | unsupported
+    alpha: 0, beta: 0, gamma: 0,
+    pitchZero: null, rollZero: null, yawZero: null,
+    shake: 0, lastEvent: 0, lastShakeLog: 0, events: 0,
+    attached: false        // listeners bound (independent of the label state)
+  };
+  /* flip a sign here if an axis feels inverted on your handset */
+  const PITCH_SIGN = 1, ROLL_SIGN = 1, YAW_SIGN = 1;
+  const COARSE = window.matchMedia('(pointer: coarse)').matches;
+
+  const angleDelta = (a, zero) => ((a - zero + 540) % 360) - 180;
+
+  function onOrient(e) {
+    if (e.beta == null && e.gamma == null) return;
+    MO.events++;
+    MO.lastEvent = performance.now();
+    MO.beta = e.beta || 0; MO.gamma = e.gamma || 0; MO.alpha = e.alpha || 0;
+    if (MO.pitchZero === null) {
+      MO.pitchZero = MO.beta; MO.rollZero = MO.gamma; MO.yawZero = MO.alpha;
+      pushLog('OK', `gyro zeroed @ \u03b2${MO.beta.toFixed(0)}\u00b0 \u03b3${MO.gamma.toFixed(0)}\u00b0`);
+    }
+  }
+
+  function onMotion(e) {
+    const a = e.accelerationIncludingGravity || e.acceleration;
+    if (!a) return;
+    const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
+    MO.shake = Math.max(MO.shake, Math.abs(mag - 9.81));
+    if (MO.shake > 3.2 && performance.now() - MO.lastShakeLog > 2000) {
+      MO.lastShakeLog = performance.now();
+      pushLog('WARN', `impact spike \u00b7 ${MO.shake.toFixed(1)} m/s\u00b2 lateral load`);
+    }
+  }
+
+  const simLabel = () => (COARSE ? 'TILT // TAP TO LINK' : 'TILT // SIM');
+
+  function motionUI(state, text) {
+    const chip = $('imuChip');
+    chip.classList.toggle('linked', state === 'linked');
+    chip.classList.toggle('denied', state === 'denied' || state === 'nosensor');
+    chip.textContent =
+      state === 'linked' ? 'TILT // DEVICE' :
+      state === 'denied' ? 'TILT // BLOCKED' :
+      state === 'nosensor' ? 'TILT // NO SENSOR' :
+      simLabel();
+    const hint = $('motionHint');
+    hint.classList.toggle('on', Boolean(text));
+    hint.classList.toggle('denied', state !== 'linked');
+    $('motionHintText').textContent = text || '';
+    $('motionHintMeta').textContent = state === 'linked' ? 'GYRO + ACCEL' : 'OFFLINE';
+    $('recenterBtn').hidden = state !== 'linked';
+  }
+
+  async function linkMotion() {
+    if (!MO.supported) {
+      MO.state = 'unsupported';
+      motionUI('nosensor', 'NO ORIENTATION SENSOR HERE \u2014 SIMULATION CONTINUES');
+      pushLog('WARN', 'tilt link unavailable \u00b7 no orientation sensor reported');
+      return;
+    }
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const res = await DeviceOrientationEvent.requestPermission();
+        if (res !== 'granted') throw new Error('orientation permission denied');
+      }
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        try { await DeviceMotionEvent.requestPermission(); } catch (_) { /* accel is optional */ }
+      }
+    } catch (err) {
+      MO.state = 'denied';
+      motionUI('denied', 'MOTION ACCESS BLOCKED \u2014 ALLOW MOTION & ORIENTATION IN SETTINGS');
+      pushLog('WARN', `tilt link refused \u00b7 ${err.message || 'permission denied'}`);
+      return;
+    }
+
+    MO.pitchZero = MO.rollZero = MO.yawZero = null;
+    window.addEventListener('deviceorientation', onOrient, true);
+    window.addEventListener('devicemotion', onMotion, true);
+    MO.attached = true;
+    MO.state = 'linked';
+    motionUI('linked', 'TILT LINK ACTIVE \u2014 MOVE YOUR DEVICE TO FLY THE CHASSIS');
+    pushLog('SYS', 'tilt link established \u00b7 orientation + accelerometer streaming');
+
+    /* Never pretend to be linked if nothing arrives (desktop browsers). */
+    setTimeout(() => {
+      if (MO.state === 'linked' && MO.events === 0) {
+        MO.state = 'nosensor';
+        motionUI('nosensor', 'LINKED, BUT NO SENSOR DATA \u2014 DESKTOP HAS NO TILT');
+        pushLog('WARN', 'tilt link idle \u00b7 no orientation events received');
+      }
+    }, 1500);
+  }
+
+  function unlinkMotion() {
+    window.removeEventListener('deviceorientation', onOrient, true);
+    window.removeEventListener('devicemotion', onMotion, true);
+    MO.state = 'sim'; MO.events = 0; MO.attached = false;
+    MO.pitchZero = MO.rollZero = MO.yawZero = null;
+    MO.shake = 0;
+    motionUI('sim', '');
+    pushLog('SYS', 'tilt link released \u00b7 returning to simulated flight model');
+  }
+
+  $('imuChip').addEventListener('click', () => {
+    if (MO.state === 'linked') unlinkMotion(); else linkMotion();
+  });
+  $('recenterBtn').addEventListener('click', () => {
+    MO.pitchZero = MO.beta; MO.rollZero = MO.gamma; MO.yawZero = MO.alpha;
+    S.pitch = S.roll = S.yaw = 0;
+    pushLog('OK', 'attitude recentered \u00b7 current phone pose treated as level');
+  });
+  motionUI('sim', '');
+
+  /* ================================================================== loop */
+  let lastFrame = performance.now();
+  let lastSecond = -1;
+  let lastTick = 0;
+
+  function frame(now) {
+    lastTick = now;
+    const dt = Math.min(0.25, (now - lastFrame) / 1000) || 0.016;
+    lastFrame = now;
+    S.t += dt;
+
+    /* Live tilt input only while events keep arriving \u2014 if the sensor feed
+       dies (screen lock, backgrounded tab) we fall back to the flight model
+       instead of freezing the chassis in a stale pose. */
+    const devLive = MO.attached && MO.events > 0 && (now - MO.lastEvent) < 1500;
+    if (devLive && MO.state !== 'linked') {
+      /* sensor came up late (or came back) \u2014 take over without a re-tap */
+      MO.state = 'linked';
+      motionUI('linked', 'TILT LINK ACTIVE \u2014 MOVE YOUR DEVICE TO FLY THE CHASSIS');
+      pushLog('OK', 'tilt link online \u00b7 handing attitude control to this device');
+    }
+    MO.shake *= 0.88;
+
+    /* ---- random-walk targets ---- */
+    if (S.t > S.nextSpike) {
+      S.nextSpike = S.t + rnd(6.5, 11);
+      S.spikeUntil = S.t + rnd(0.5, 0.95);
+      S.spikeCount++;
+    }
+    if (S.t > S.nextSag) {
+      S.nextSag = S.t + rnd(4.2, 6.4);
+      S.sagUntil = S.t + rnd(0.9, 1.3);
+      S.sagCount++;
+    }
+    if (S.t > S.nextBeep) {
+      S.nextBeep = S.t + rnd(1.4, 3.2);
+      const l = TERM[(Math.random() * TERM.length) | 0];
+      pushLog(l[0], l[1]);
+    }
+    ['FL', 'FR', 'RL', 'RR'].forEach((k) => {
+      const m = S.motors[k];
+      if (devLive) {
+        /* Differential mix: +pitch = nose down (front motors spool up),
+           +roll = rolled right (right motors spool up) \u2014 so the motor
+           columns always agree with the attitude the pilot sees. */
+        const base = 40 + S.throttle * 0.5;
+        const fwd = S.pitch * 0.75;
+        const rgt = S.roll * 0.75;
+        m.target = clamp(
+          (k[0] === 'F' ? base + fwd : base - fwd) + (k[1] === 'R' ? rgt : -rgt),
+          0, 100
+        );
+      } else if (S.t > m.next) {
+        m.next = S.t + rnd(0.22, 0.6);
+        const spiking = S.t < S.spikeUntil;
+        m.target = spiking ? rnd(92, 100) : rnd(60, 95);
+      }
+    });
+
+    /* ---- attitude: the flight model, or the phone in your hand ---- */
+    if (devLive) {
+      S.pitchT = clamp(PITCH_SIGN * (MO.beta - MO.pitchZero), -50, 50);
+      S.rollT = clamp(ROLL_SIGN * (MO.gamma - MO.rollZero), -50, 50);
+      S.yawT = clamp(YAW_SIGN * angleDelta(MO.alpha, MO.yawZero), -90, 90);
+      const kd = reduced ? 0.08 : 0.2;   // track the hand closely, still smoothed
+      S.pitch = LERP(S.pitch, S.pitchT, kd);
+      S.roll = LERP(S.roll, S.rollT, kd);
+      S.yaw = LERP(S.yaw, S.yawT, kd * 0.8);
+    } else {
+      if (S.t > S.gyroNext) {
+        S.gyroNext = S.t + 0.2;
+        S.pitchT = rnd(-19, 19);
+        S.yawT = rnd(-28, 28);
+        S.rollT = rnd(-14, 14);
+      }
+      const k = reduced ? 0.06 : 0.055;
+      S.pitch = LERP(S.pitch, S.pitchT + Math.sin(S.t * 3.4) * 0.7, k);
+      S.yaw = LERP(S.yaw, S.yawT + Math.sin(S.t * 2.1) * 1.1, k);
+      S.roll = LERP(S.roll, S.rollT + Math.cos(S.t * 2.7) * 0.6, k);
+    }
+
+    /* ---- throttle + motor smoothing ---- */
+    S.throttle = LERP(S.throttle, S.thrTarget, reduced ? 0.02 : 0.05);
+    Object.keys(S.motors).forEach((key, i) => {
+      const m = S.motors[key];
+      const skew = Math.sin(S.t * 4 + i * 1.7) * (devLive ? 0.8 : 2.4);
+      m.v = LERP(m.v, clamp(m.target + skew, 0, 100), reduced ? 0.03 : 0.22);
+    });
+
+    if (devLive) {
+      S.steerTarget = clamp(S.yaw * 0.8, -28, 28);   // heading drives the rudder
+    } else if (S.t > (S.steerNext || 0)) {
+      S.steerNext = S.t + rnd(0.8, 2.2); S.steerTarget = rnd(-24, 24);
+    }
+    S.steer = LERP(S.steer, S.steerTarget, devLive ? 0.12 : 0.03);
+
+    const tiltMag = Math.sqrt(S.pitch * S.pitch + S.roll * S.roll);
+    S.gTarget = devLive
+      ? 0.85 + (tiltMag / 50) * 0.85 + (S.throttle / 100) * 0.5 + MO.shake * 0.05
+      : 0.9 + (S.throttle / 100) * 1.35;
+    S.gforce = LERP(S.gforce, S.gTarget + Math.sin(S.t * 5.2) * (devLive ? 0.02 : 0.06), 0.05);
+
+    /* sag is edge-triggered: logged exactly once per event, whatever the
+       frame rate, so the warning can never be skipped between frames */
+    const sagging = S.t < S.sagUntil;
+    if (sagging !== S.sagActive) {
+      S.sagActive = sagging;
+      if (sagging) pushLog('WARN', 'pack voltage sag under throttle · failsafe watch');
+      else pushLog('OK', 'pack voltage recovered · 3.70V/cell');
+    }
+    /* in tilt mode the pack follows real motor load, not the throttle channel */
+    const motorAvg = (S.motors.FL.v + S.motors.FR.v + S.motors.RL.v + S.motors.RR.v) / 4;
+    S.amps = LERP(S.amps,
+      (devLive ? 5 + motorAvg * 0.3 : 8 + (S.throttle / 100) * 26) + rnd(-0.6, 0.6), 0.08);
+    S.cellV = LERP(S.cellV, sagging ? 3.42 + rnd(-.01, .01) : 3.70 + rnd(-.006, .006), 0.12);
+    S.escTemp = LERP(S.escTemp, 38 + (S.throttle / 100) * 12 + rnd(-.4, .5), 0.02);
+    S.mah += (S.amps * dt) / 3.6 / 3.6;
+    S.rssiTarget = -52 + rnd(-8, 4) - (S.throttle > 88 ? 6 : 0);
+    S.rssi = LERP(S.rssi, S.rssiTarget, 0.06);
+    S.lat = LERP(S.lat, 9 + (100 - S.throttle) * 0.06 + rnd(-1, 1.4), 0.05);
+    S.pkts = LERP(S.pkts, 17 + (S.throttle / 100) * 4.5 + rnd(-.3, .3), 0.05);
+    S.loss = sagging ? rnd(0.1, 0.44) : rnd(0, 0.06);
+
+    /* ================================ WRITE ================================ */
+    // Panel A
+    const plane = $('gyroPlane');
+    plane.style.transform =
+      `rotateX(${(-S.pitch).toFixed(2)}deg) rotateY(${S.yaw.toFixed(2)}deg) rotateZ(${S.roll.toFixed(2)}deg)`;
+    $('pitch').textContent = S.pitch.toFixed(1);
+    $('yaw').textContent = S.yaw.toFixed(1);
+    $('roll').textContent = S.roll.toFixed(1);
+    $('gforce').textContent = S.gforce.toFixed(2);
+    $('pitchBar').style.left = (50 + (S.pitch / 25) * 50) + '%';
+    $('yawBar').style.left = (50 + (S.yaw / 35) * 50) + '%';
+    $('rollBar').style.left = (50 + (S.roll / 20) * 50) + '%';
+    $('gBar').style.left = (clamp((S.gforce - 0.8) / 1.8, 0, 1) * 100) + '%';
+    const tilt = Math.sqrt(S.pitch * S.pitch + S.roll * S.roll);
+    $('tiltVal').textContent = tilt.toFixed(1) + '°';
+    $('tiltBar').style.transform = `translateX(${clamp(tilt / 1.4, 0, 50)}px)`;
+    $('attBadge').textContent = devLive
+      ? `TILT LINK // LIVE${MO.shake > 1.2 ? ` \u26a0 ${MO.shake.toFixed(1)}m/s\u00b2` : ''}`
+      : S.armed
+        ? `ATT HOLD // ${(0.04 + Math.random() * 0.09).toFixed(2)}s`
+        : 'ATT HOLD // SAFE';
+
+    // Panel B
+    let total = 0;
+    Object.keys(S.motors).forEach((key) => {
+      const m = S.motors[key];
+      const node = document.querySelector(`.motor[data-m="${key}"]`);
+      const hot = m.v > 89;
+      node.querySelector('.fill').style.height = m.v.toFixed(1) + '%';
+      node.querySelector('.peak').style.bottom = m.v.toFixed(1) + '%';
+      node.querySelector('.pct').textContent = Math.round(m.v);
+      node.classList.toggle('hot', hot);
+      node.classList.toggle('over', m.v > 96);
+      total += m.v;
+    });
+    const avg = total / 4;
+    ledEls.forEach((el, i) => {
+      const on = avg / 100 > i / LEDS;
+      el.classList.toggle('lit', on);
+      el.classList.toggle('red', on && i >= LEDS - 3);
+    });
+    const thrust = (total / 400) * 34.2;
+    $('thrustVal').textContent = thrust.toFixed(1) + ' N';
+    $('thrustBar').style.transform = `translateX(${(total / 400) * 100}%)`;
+
+    // Panel C
+    const sagOn = sagging || S.cellV < 3.52;
+    $('cellV').textContent = S.cellV.toFixed(2);
+    $('packV').textContent = (S.cellV * 6).toFixed(2);
+    $('amps').textContent = S.amps.toFixed(1);
+    $('escTemp').textContent = S.escTemp.toFixed(1);
+    $('mah').textContent = Math.round(S.mah);
+    $('sagD').textContent = Math.abs(3.70 - S.cellV).toFixed(2);
+    $('powerPanel').classList.toggle('sag', sagOn);
+    ampSpark.push(S.amps);
+
+    // KPI strip
+    $('thr').textContent = Math.round(S.throttle);
+    $('steer').textContent = S.steer.toFixed(1);
+    $('incline').textContent = (S.pitch * 0.72).toFixed(1);
+    $('slip').textContent = Math.abs(S.steer * 0.4).toFixed(1);
+    $('rssi').textContent = Math.round(S.rssi);
+    $('rssiMini').textContent = Math.round(S.rssi);
+    $('loss').textContent = S.loss.toFixed(2);
+    $('escMax').textContent = S.escTemp.toFixed(1);
+    $('lat').textContent = Math.round(S.lat);
+    $('ping').textContent = Math.round(S.lat);
+    $('pkts').textContent = S.pkts.toFixed(1);
+    $('thrMeter').style.width = S.throttle.toFixed(1) + '%';
+    $('steerMeter').style.left = clamp(50 + (S.steer / 24) * 50, 0, 100) + '%';
+    $('inclineMeter').style.left = clamp(50 + ((S.pitch * 0.72) / 18) * 50, 0, 100) + '%';
+    $('tempMeter').style.width = clamp(((S.escTemp - 35) / 25) * 100, 0, 100) + '%';
+    $('latMeter').style.width = clamp(((S.lat - 5) / 25) * 100, 0, 100) + '%';
+
+    const hot = S.escTemp > 47;
+    $('tempState').textContent = hot ? 'ELEVATED' : 'NOMINAL';
+    $('tempKpi').classList.toggle('warn', hot);
+    $('tempRow').classList.toggle('alert', hot);
+    rssiSpark.push(S.rssi);
+
+    // Header
+    const secs = Math.floor((Date.now() - RUN_START) / 1000);
+    const hh = String(Math.floor(secs / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+    const ss = String(secs % 60).padStart(2, '0');
+    if (secs !== lastSecond) {
+      lastSecond = secs;
+      $('runTime').textContent = `${hh}:${mm}:${ss}`;
+      $('loopRate').textContent = (995 + Math.round(Math.random() * 10));
+      $('clock').textContent = new Date().toLocaleTimeString('en-GB', { hour12: false });
+      if (MO.attached) {
+        $('imuChip').textContent = devLive ? 'TILT // DEVICE' : 'TILT // SILENT';
+      }
+      $('packChip').textContent = `PACK // 6S · ${Math.round(clamp(S.mah, 0, 99999))}mAh`;
+    }
+
+    ampSpark.draw();
+    rssiSpark.draw();
+    requestAnimationFrame(frame);
+  }
+
+  // stagger motor targets so nothing starts perfectly in sync
+  S.motors.FL.next = 0.1; S.motors.FR.next = 0.3;
+  S.motors.RL.next = 0.5; S.motors.RR.next = 0.7;
+
+  // paint a live first frame immediately, then let the loop self-schedule
+  frame(performance.now());
+
+  /* Safety driver: if rAF stalls (hidden/occluded tab, throttled compositor)
+     the simulation keeps stepping instead of freezing on its opening values. */
+  setInterval(() => {
+    if (performance.now() - lastTick > 250) frame(performance.now());
+  }, 160);
+
+  window.addEventListener('resize', () => { ampSpark.draw(); rssiSpark.draw(); });
+
+  pushLog('SYS', 'PROTODECK telemetry console online');
+  pushLog('OK', 'all subsystems nominal · awaiting arm command');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PHISHLENS // Forensic Scam Deconstructor</title>
+    <meta
+      name="description"
+      content="PHISHLENS — an offline forensic workbench that deconstructs scam messages into their manipulation primitives."
+    />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c0f14'/%3E%3Cpath d='M16 5l9 4v7c0 6-4 9.5-9 11-5-1.5-9-5-9-11V9z' fill='none' stroke='%2300F0FF' stroke-width='2'/%3E%3Ccircle cx='16' cy='15' r='3' fill='%23FF3B30'/%3E%3C/svg%3E"
+    />
+  </head>
+
+  <body class="min-h-screen bg-obsidian text-ink">
+    <!-- ================= BACKDROP ================= -->
+    <div class="pointer-events-none fixed inset-0 z-0">
+      <div class="absolute inset-0 cyber-grid opacity-70"></div>
+      <div class="absolute inset-0 bg-vignette"></div>
+      <div class="absolute inset-0 scanlines opacity-40 mix-blend-overlay"></div>
+      <div
+        class="absolute -left-40 top-10 h-[420px] w-[420px] rounded-full bg-cyan/10 blur-[130px]"
+      ></div>
+      <div
+        class="absolute -right-40 bottom-0 h-[420px] w-[420px] rounded-full bg-violet/10 blur-[140px]"
+      ></div>
+    </div>
+
+    <div class="relative z-10 flex min-h-screen flex-col">
+      <!-- ================= HEADER ================= -->
+      <header
+        class="glass sticky top-0 z-40 border-x-0 border-t-0 border-b border-edge/80"
+      >
+        <div
+          class="mx-auto flex w-full max-w-[1900px] flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6"
+        >
+          <!-- brand -->
+          <div class="flex items-center gap-3">
+            <div
+              class="relative grid h-10 w-10 shrink-0 place-items-center border border-cyan/50 bg-cyan/10"
+              style="box-shadow: 0 0 18px rgba(0, 240, 255, 0.35), inset 0 0 14px rgba(0, 240, 255, 0.16)"
+            >
+              <svg viewBox="0 0 32 32" class="h-5 w-5">
+                <path
+                  d="M16 4l9 4v7c0 6.2-4.2 9.7-9 11.2C11.2 24.7 7 21.2 7 15V8z"
+                  fill="none"
+                  stroke="#00F0FF"
+                  stroke-width="2"
+                />
+                <circle cx="16" cy="15" r="3" fill="#FF3B30" />
+              </svg>
+              <span
+                class="absolute inset-0 animate-flicker bg-cyan/5"
+                aria-hidden="true"
+              ></span>
+            </div>
+
+            <div class="min-w-0">
+              <h1
+                class="neon-cyan-text truncate text-[13px] font-bold tracking-[0.22em] sm:text-[15px] lg:text-[17px]"
+              >
+                PHISHLENS
+                <span class="text-ink-dim">//</span>
+                <span class="text-ink/90">FORENSIC SCAM DECONSTRUCTOR</span>
+              </h1>
+              <p
+                class="mt-0.5 hidden text-[10px] tracking-[0.28em] text-ink-faint sm:block"
+              >
+                OFFLINE ANALYSIS CELL — BUILD 0.9.4 — MOCK CORPUS LOADED
+              </p>
+            </div>
+          </div>
+
+          <!-- status + nav -->
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div
+              class="flex items-center gap-2 border border-safe/40 bg-safe/10 px-3 py-1.5"
+              style="box-shadow: 0 0 16px rgba(52, 199, 89, 0.18)"
+            >
+              <span class="relative flex h-2 w-2">
+                <span
+                  class="h-2 w-2 animate-pulse-dot rounded-full bg-safe"
+                ></span>
+              </span>
+              <span class="text-[10px] tracking-[0.2em] text-safe"
+                >SYSTEM STATUS: ACTIVE</span
+              >
+            </div>
+
+            <nav
+              class="flex items-center gap-1 text-[10px] tracking-[0.18em]"
+              aria-label="Utility"
+            >
+              <button
+                data-tab="Scan Terminal"
+                class="tab-btn border border-cyan/60 bg-cyan/15 px-3 py-1.5 text-cyan"
+                style="box-shadow: 0 0 14px rgba(0, 240, 255, 0.28)"
+              >
+                SCAN TERMINAL
+              </button>
+              <button
+                data-tab="Patterns"
+                class="tab-btn border border-edge px-3 py-1.5 text-ink-dim transition hover:border-cyan/50 hover:text-ink"
+              >
+                PATTERNS
+              </button>
+              <button
+                data-tab="Threat DB"
+                class="tab-btn border border-edge px-3 py-1.5 text-ink-dim transition hover:border-cyan/50 hover:text-ink"
+              >
+                THREAT DB
+              </button>
+              <button
+                data-tab="Help"
+                class="tab-btn border border-edge px-3 py-1.5 text-ink-dim transition hover:border-cyan/50 hover:text-ink"
+              >
+                HELP
+              </button>
+            </nav>
+          </div>
+        </div>
+        <div class="hairline h-px w-full"></div>
+      </header>
+
+      <!-- ================= TAB NOTICE ================= -->
+      <div
+        id="tabNotice"
+        class="mx-auto hidden w-full max-w-[1900px] px-4 pt-3 lg:px-6"
+      >
+        <div
+          class="flex items-center gap-3 border border-amber/40 bg-amber/10 px-3 py-2 text-[11px] tracking-[0.12em] text-amber"
+        >
+          <span>◆</span>
+          <span id="tabNoticeText"
+            >MODULE INERT — this build ships the Scan Terminal module only.</span
+          >
+          <button
+            id="tabNoticeClose"
+            class="ml-auto text-amber/70 hover:text-amber"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- ================= WORKBENCH ================= -->
+      <main
+        class="mx-auto grid w-full max-w-[1900px] flex-1 grid-cols-1 gap-4 px-4 py-4 lg:px-6 xl:grid-cols-[330px_minmax(0,1fr)_372px] xl:gap-5"
+      >
+        <!-- ============================================================
+             LEFT — INPUT & PRESETS
+             ============================================================ -->
+        <section
+          class="flex min-w-0 flex-col gap-4 xl:max-h-[calc(100vh-104px)] xl:overflow-y-auto xl:pr-1 fp-scroll"
+          aria-label="Input and presets"
+        >
+          <!-- input block -->
+          <div class="glass relative">
+            <div
+              class="flex items-center justify-between border-b border-edge px-3 py-2"
+            >
+              <h2 class="text-[11px] tracking-[0.22em] text-ink-dim">
+                INPUT VECTOR
+              </h2>
+              <span class="text-[10px] tracking-[0.18em] text-ink-faint"
+                >MANUAL</span
+              >
+            </div>
+
+            <div class="space-y-3 p-3">
+              <label
+                for="rawInput"
+                class="block text-[10px] tracking-[0.2em] text-ink-dim"
+              >
+                PASTE SUSPICIOUS MESSAGE / URL
+              </label>
+
+              <div class="relative">
+                <textarea
+                  id="rawInput"
+                  rows="9"
+                  spellcheck="false"
+                  placeholder="Paste an SMS, email, DM or raw URL here…"
+                  class="fp-scroll block w-full resize-y border border-edge bg-obsidian-2/80 p-3 text-[12px] leading-relaxed text-ink placeholder:text-ink-faint focus:border-cyan/60 focus:outline-none"
+                  style="min-height: 170px"
+                ></textarea>
+                <div
+                  class="pointer-events-none absolute inset-x-px top-px h-px bg-gradient-to-r from-transparent via-cyan/40 to-transparent"
+                ></div>
+              </div>
+
+              <div
+                class="flex items-center justify-between text-[10px] tracking-[0.14em] text-ink-faint"
+              >
+                <span id="inputMeta">0 CHARS // 0 LINES</span>
+                <button
+                  id="clearInput"
+                  class="border border-edge px-2 py-1 transition hover:border-danger/60 hover:text-danger"
+                >
+                  CLEAR
+                </button>
+              </div>
+
+              <button
+                id="deconstructBtn"
+                class="btn-neon group flex w-full items-center justify-center gap-2 px-4 py-3 text-[12px] font-bold"
+              >
+                <svg viewBox="0 0 24 24" class="h-4 w-4">
+                  <path
+                    d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  />
+                </svg>
+                <span>DECONSTRUCT SAMPLE</span>
+              </button>
+
+              <p class="text-[10px] leading-relaxed tracking-[0.06em] text-ink-faint">
+                Local heuristic engine — no packets leave this device.
+              </p>
+            </div>
+          </div>
+
+          <!-- presets -->
+          <div class="glass relative">
+            <div
+              class="flex items-center justify-between border-b border-edge px-3 py-2"
+            >
+              <h2 class="text-[11px] tracking-[0.22em] text-ink-dim">
+                SELECT PRESET
+                <span class="text-ink-faint">// Pre-loaded</span>
+              </h2>
+              <span class="text-[10px] tracking-[0.18em] text-cyan/70"
+                id="presetCount">3</span
+              >
+            </div>
+            <div id="presetList" class="space-y-2 p-3"></div>
+          </div>
+
+          <div
+            class="border border-edge/70 bg-charcoal/40 px-3 py-2 text-[10px] leading-relaxed tracking-[0.1em] text-ink-faint"
+          >
+            CORPUS: 3 SEEDED SAMPLE SETS · 7 SIGNATURES · 100% LOCAL<br />
+            Every metric below is simulated for rapid offline prototyping.
+          </div>
+        </section>
+
+        <!-- ============================================================
+             CENTER — FORENSIC FILTER CANVAS
+             ============================================================ -->
+        <section class="flex min-w-0 flex-col gap-4" aria-label="Analysis canvas">
+          <div class="glass relative flex min-h-[620px] flex-1 flex-col">
+            <!-- toolbar -->
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 border-b border-edge px-4 py-3"
+            >
+              <div class="flex items-center gap-3">
+                <h2
+                  class="neon-cyan-text text-[12px] font-bold tracking-[0.24em] sm:text-[13px]"
+                >
+                  FORENSIC FILTER
+                </h2>
+                <span
+                  id="canvasVector"
+                  class="border border-edge px-2 py-1 text-[10px] tracking-[0.16em] text-ink-dim"
+                  >SMS / EMAIL RELAY</span
+                >
+              </div>
+
+              <div class="flex items-center gap-3">
+                <span
+                  id="xrayLabel"
+                  class="text-[10px] tracking-[0.18em] text-cyan"
+                  >[X-RAY ENABLED]</span
+                >
+                <button
+                  id="xrayToggle"
+                  role="switch"
+                  aria-checked="true"
+                  aria-label="Toggle x-ray highlighting"
+                  class="relative h-5 w-10 border border-cyan/60 bg-cyan/20 transition"
+                >
+                  <span
+                    id="xrayKnob"
+                    class="absolute top-[2px] left-[2px] h-[14px] w-[14px] bg-cyan transition-transform duration-200"
+                    style="box-shadow: 0 0 12px rgba(0, 240, 255, 0.9)"
+                  ></span>
+                </button>
+              </div>
+            </div>
+
+            <!-- canvas -->
+            <div class="relative flex-1 p-4">
+              <div
+                id="fpCanvas"
+                data-xray="on"
+                class="fp-canvas relative h-full"
+              >
+                <div id="fpRow" class="relative flex h-full gap-4">
+                  <!-- message -->
+                  <div class="relative flex min-w-0 flex-1 flex-col">
+                    <div
+                      class="mb-2 flex items-center gap-2 text-[10px] tracking-[0.18em] text-ink-faint"
+                    >
+                      <span class="h-1.5 w-1.5 bg-cyan/70"></span>
+                      <span id="canvasSource">SEIZED ARTIFACT // PRESET: delivery</span>
+                    </div>
+                    <div
+                      class="relative flex-1 overflow-hidden border border-edge/80 bg-obsidian-2/70"
+                    >
+                      <div
+                        class="pointer-events-none absolute inset-x-0 top-0 z-20 h-24 bg-gradient-to-b from-cyan/12 to-transparent animate-scan-sweep"
+                      ></div>
+                      <pre
+                        id="fpMessage"
+                        class="fp-scroll relative z-10 m-0 h-full overflow-auto whitespace-pre-wrap break-words p-4 text-[12.5px] leading-[1.85] tracking-[0.02em] text-ink/90"
+                      ></pre>
+                    </div>
+                  </div>
+
+                  <!-- tag rail -->
+                  <aside
+                    class="relative hidden w-[228px] shrink-0 lg:block"
+                    aria-label="Forensic callouts"
+                  >
+                    <div
+                      class="mb-2 text-[10px] tracking-[0.18em] text-ink-faint"
+                    >
+                      SIGNATURE CALL-OUTS
+                    </div>
+                    <div id="fpRail" class="relative h-full"></div>
+                  </aside>
+                </div>
+
+                <!-- svg overlay for pointer lines -->
+                <svg
+                  id="fpSvg"
+                  class="pointer-events-none absolute inset-0 z-30 h-full w-full overflow-visible"
+                  aria-hidden="true"
+                ></svg>
+                <div id="fpPins" class="pointer-events-none absolute inset-0 z-30"></div>
+
+                <!-- scanning overlay -->
+                <div
+                  id="scanOverlay"
+                  class="absolute inset-0 z-40 hidden place-items-center bg-obsidian/85 backdrop-blur-[3px]"
+                >
+                  <div class="w-full max-w-sm px-6 text-center">
+                    <div
+                      class="glitch neon-cyan-text mb-3 text-[15px] font-bold tracking-[0.28em]"
+                      data-text="SCANNING PACKET"
+                    >
+                      SCANNING PACKET
+                    </div>
+                    <div
+                      class="mb-4 text-[10px] tracking-[0.2em] text-ink-dim"
+                      id="scanStage"
+                    >
+                      INITIALISING HEURISTIC PASS…
+                    </div>
+                    <div class="h-1.5 w-full border border-edge bg-obsidian-2">
+                      <div
+                        id="scanBar"
+                        class="h-full bg-gradient-to-r from-cyan to-safe"
+                        style="width: 0%"
+                      ></div>
+                    </div>
+                    <div
+                      class="mt-3 text-left text-[10px] leading-relaxed text-ink-dim fp-scroll"
+                      id="scanTicker"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- canvas footer -->
+            <div
+              class="flex flex-wrap items-center justify-between gap-3 border-t border-edge px-4 py-2.5 text-[10px] tracking-[0.16em] text-ink-faint"
+            >
+              <span id="canvasVerdict">VERDICT: PHISHING — QUARANTINE ADVISED</span>
+              <span id="canvasCounts"
+                >4 SIGNATURES · 1 EXTERNAL LINK · 1 PANIC TRIGGER</span
+              >
+            </div>
+          </div>
+
+          <!-- signature detail drawer -->
+          <div class="glass relative">
+            <div class="flex items-center justify-between border-b border-edge px-4 py-2">
+              <h2 class="text-[11px] tracking-[0.22em] text-ink-dim">
+                ISOLATED SIGNATURE
+              </h2>
+              <span
+                id="detailCode"
+                class="border border-edge px-2 py-0.5 text-[10px] tracking-[0.16em] text-ink-faint"
+                >SIG-01</span
+              >
+            </div>
+            <div id="detailBody" class="p-4"></div>
+            <p
+              id="detailHint"
+              class="border-t border-edge px-4 py-2 text-[10px] tracking-[0.12em] text-ink-faint"
+            >
+              HOVER OR CLICK ANY HIGHLIGHT IN THE FILTER CANVAS TO FOCUS ITS SIGNATURE.
+            </p>
+          </div>
+        </section>
+
+        <!-- ============================================================
+             RIGHT — THREAT METRICS
+             ============================================================ -->
+        <section
+          class="flex min-w-0 flex-col gap-4 xl:max-h-[calc(100vh-104px)] xl:overflow-y-auto xl:pl-1 fp-scroll"
+          aria-label="Threat metrics"
+        >
+          <!-- gauge -->
+          <div class="glass relative">
+            <div
+              class="flex items-center justify-between border-b border-edge px-3 py-2"
+            >
+              <h2 class="text-[11px] tracking-[0.22em] text-ink-dim">
+                THREAT INDEX
+              </h2>
+              <span
+                id="gaugeChannel"
+                class="text-[10px] tracking-[0.16em] text-ink-faint"
+                >LIVE</span
+              >
+            </div>
+            <div class="flex flex-col items-center px-4 pt-4 pb-2">
+              <svg viewBox="0 0 240 240" class="w-full max-w-[224px]">
+                <defs>
+                  <filter id="gaugeGlow" x="-60%" y="-60%" width="220%" height="220%">
+                    <feGaussianBlur stdDeviation="5" result="b" />
+                    <feMerge>
+                      <feMergeNode in="b" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <g transform="rotate(135 120 120)">
+                  <circle
+                    id="gaugeTrack"
+                    cx="120"
+                    cy="120"
+                    r="88"
+                    fill="none"
+                    stroke="#1e2a36"
+                    stroke-width="11"
+                    stroke-linecap="round"
+                    stroke-dasharray="414.69 552.92"
+                  />
+                </g>
+
+                <g
+                  id="gaugeTicks"
+                  stroke="#2a3947"
+                  stroke-width="1.5"
+                  aria-hidden="true"
+                ></g>
+
+                <!-- progress arc (unicode-safe: uses rotate group) -->
+                <g transform="rotate(135 120 120)">
+                  <circle
+                    id="gaugeProgress"
+                    class="gauge-progress"
+                    cx="120"
+                    cy="120"
+                    r="88"
+                    fill="none"
+                    stroke="#FF3B30"
+                    stroke-width="11"
+                    stroke-linecap="round"
+                    stroke-dasharray="414.69 552.92"
+                    stroke-dashoffset="414.69"
+                    filter="url(#gaugeGlow)"
+                  />
+                </g>
+
+                <g
+                  id="gaugeNeedle"
+                  class="gauge-needle"
+                  style="transform-origin: 120px 120px"
+                >
+                  <line
+                    x1="120"
+                    y1="128"
+                    x2="120"
+                    y2="50"
+                    stroke="#eaf4ff"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                  />
+                  <polygon points="120,44 116,54 124,54" fill="#00F0FF" />
+                </g>
+
+                <circle cx="120" cy="120" r="7" fill="#0c0f14" stroke="#00F0FF" stroke-width="2" />
+                <circle cx="120" cy="120" r="2.5" fill="#00F0FF" />
+
+                <text
+                  id="gaugeValue"
+                  x="120"
+                  y="120"
+                  text-anchor="middle"
+                  font-size="34"
+                  font-weight="700"
+                  fill="#eaf4ff"
+                >
+                  94%
+                </text>
+                <text
+                  id="gaugeLabel"
+                  x="120"
+                  y="142"
+                  text-anchor="middle"
+                  font-size="10"
+                  letter-spacing="3"
+                  fill="#7d8f9f"
+                >
+                  CRITICAL
+                </text>
+                <text
+                  x="120"
+                  y="218"
+                  text-anchor="middle"
+                  font-size="9.5"
+                  letter-spacing="2.6"
+                  fill="#4d5f6f"
+                >
+                  THREAT LEVEL
+                </text>
+              </svg>
+
+              <div class="mt-1 w-full text-center">
+                <div
+                  id="threatHeadline"
+                  class="text-[13px] font-bold tracking-[0.2em] text-danger"
+                >
+                  THREAT LEVEL: CRITICAL (94%)
+                </div>
+                <div
+                  id="threatSub"
+                  class="mt-1 text-[10px] tracking-[0.16em] text-ink-faint"
+                >
+                  COMPOSITE OF 4 SIGNATURES · CONFIDENCE 96%
+                </div>
+              </div>
+
+              <!-- telemetry strip -->
+              <div
+                id="telemetry"
+                class="mt-4 grid w-full grid-cols-2 gap-2"
+              ></div>
+            </div>
+            <div
+              id="summary"
+              class="border-t border-edge px-4 py-3 text-[11px] leading-relaxed text-ink-dim"
+            ></div>
+          </div>
+
+          <!-- log -->
+          <div class="glass relative">
+            <div
+              class="flex items-center justify-between border-b border-edge px-3 py-2"
+            >
+              <h2 class="text-[11px] tracking-[0.22em] text-ink-dim">
+                DECONSTRUCTION LOG
+              </h2>
+              <span class="flex items-center gap-1.5 text-[10px] text-safe">
+                <span class="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-safe"></span>
+                STREAMING
+              </span>
+            </div>
+            <pre
+              id="logBody"
+              class="fp-scroll m-0 h-[186px] overflow-auto whitespace-pre-wrap p-3 text-[11px] leading-[1.9] text-ink-dim"
+            ></pre>
+          </div>
+
+          <!-- action items -->
+          <div class="glass relative">
+            <div
+              class="flex items-center justify-between border-b border-edge px-3 py-2"
+            >
+              <h2 class="text-[11px] tracking-[0.22em] text-ink-dim">
+                ACTION ITEMS
+              </h2>
+              <span
+                id="actionCount"
+                class="text-[10px] tracking-[0.16em] text-danger"
+                >5 DIRECTIVES</span
+              >
+            </div>
+            <ul id="actionList" class="space-y-1.5 p-3"></ul>
+          </div>
+
+          <button
+            id="exportBtn"
+            class="btn-neon w-full px-4 py-2.5 text-[11px] font-bold"
+          >
+            ⤓ EXPORT FORENSIC REPORT
+          </button>
+        </section>
+      </main>
+
+      <!-- ================= FOOTER ================= -->
+      <footer
+        class="mx-auto w-full max-w-[1900px] px-4 pb-5 lg:px-6"
+        aria-label="Footer"
+      >
+        <div
+          class="flex flex-wrap items-center justify-between gap-2 border-t border-edge pt-3 text-[10px] tracking-[0.16em] text-ink-faint"
+        >
+          <span>PHISHLENS © 2026 — SIMULATION ONLY. NO REAL THREAT FEEDS ATTACHED.</span>
+          <span id="clock" class="text-cyan/60">--:--:--</span>
+        </div>
+      </footer>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
